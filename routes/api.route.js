@@ -1,0 +1,68 @@
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
+const router = require('express').Router();
+
+router.get('/products', async (req, res, next) => {
+  try {
+    const products = await prisma.product.findMany({
+      include: { Category: true }
+    });
+    res.send({status: 200, data: products, message: "Successfully Get All Products"})
+  } catch (error) {
+    next(error)
+  }
+});
+
+router.get('/products/:id', async (req, res, next) => {
+  try {
+    const {id} = req.params
+    const product = await prisma.product.findUnique({
+      where: { id : Number(id) },
+      include : {Category: true}
+    })
+    res.send({status: 200, data: product, message: `Successfully ${id} Get Data`});
+  } catch (error) {
+    next(error)
+  }
+});
+
+router.post('/products', async (req, res, next) => {
+  try {
+    const newProduct = await prisma.product.create({
+      data: req.body
+    })
+    res.send({status: 200, data: newProduct, message: "Product is created successfully"});
+  } catch (error) {
+    next(error)
+  }
+});
+
+router.delete('/products/:id', async (req, res, next) => {
+  try {
+    const {id} = req.params
+    const product = await prisma.product.delete({
+      where: { id : Number(id) },
+      include : {Category: true}
+    })
+    res.send({status: 200, data: product, message: `Successfully Product ${id} Deleted Data`});
+  } catch (error) {
+    next(error)
+  }
+});
+
+router.patch('/products/:id', async (req, res, next) => {
+  try {
+    const {id} = req.params
+    const product = await prisma.product.update({
+      where: { id : Number(id) },
+      data: req.body,
+      include : {Category: true}
+    })
+    res.send({status: 200, data: product, message: `Successfully Product ${id} Updated Data`});
+  } catch (error) {
+    next(error)
+  }
+});
+
+module.exports = router;
