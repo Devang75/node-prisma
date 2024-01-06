@@ -24,3 +24,6 @@ npx prisma migrate dev
 
 after create one column then 
 npx prisma generate
+
+after any add column in db then complusory to run   
+npx prisma migrate dev
