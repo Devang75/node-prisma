@@ -1,20 +1,31 @@
 const { PrismaClient } = require("@prisma/client");
+const router = require("express").Router();
 
 const prisma = new PrismaClient();
-const router = require("express").Router();
+
+// Helper function for standard response format
+const sendResponse = (res, data, message) => {
+  res.send({
+    status: 200,
+    data,
+    message
+  });
+};
+
+// Helper function to handle errors
+const handleError = (error, next) => {
+  console.error(error);
+  next(error);
+};
 
 router.get("/products", async (req, res, next) => {
   try {
     const products = await prisma.product.findMany({
-      include: { Category: true }
+      include: { category: true }
     });
-    res.send({
-      status: 200,
-      data: products,
-      message: "Successfully Get All Products",
-    });
+    sendResponse(res, products, "Successfully Get All Products");
   } catch (error) {
-    next(error);
+    handleError(error, next);
   }
 });
 
@@ -23,15 +34,11 @@ router.get("/products/:id", async (req, res, next) => {
     const { id } = req.params;
     const product = await prisma.product.findUnique({
       where: { id: Number(id) },
-      include: { Category: true },
+      include: { category: true },
     });
-    res.send({
-      status: 200,
-      data: product,
-      message: `Successfully ${id} Get Data`,
-    });
+    sendResponse(res, product, `Successfully Retrieved Product ${id}`);
   } catch (error) {
-    next(error);
+    handleError(error, next);
   }
 });
 
@@ -39,14 +46,11 @@ router.post("/products", async (req, res, next) => {
   try {
     const newProduct = await prisma.product.create({
       data: req.body,
+      include: { category: true }
     });
-    res.send({
-      status: 200,
-      data: newProduct,
-      message: "Product is created successfully",
-    });
+    sendResponse(res, newProduct, "Product created successfully");
   } catch (error) {
-    next(error);
+    handleError(error, next);
   }
 });
 
@@ -55,15 +59,11 @@ router.delete("/products/:id", async (req, res, next) => {
     const { id } = req.params;
     const product = await prisma.product.delete({
       where: { id: Number(id) },
-      include: { Category: true },
+      include: { category: true },
     });
-    res.send({
-      status: 200,
-      data: product,
-      message: `Successfully Product ${id} Deleted Data`,
-    });
+    sendResponse(res, product, `Product ${id} deleted successfully`);
   } catch (error) {
-    next(error);
+    handleError(error, next);
   }
 });
 
@@ -73,83 +73,66 @@ router.patch("/products/:id", async (req, res, next) => {
     const product = await prisma.product.update({
       where: { id: Number(id) },
       data: req.body,
-      include: { Category: true },
+      include: { category: true },
     });
-    await prisma.$disconnect();
-    return res.send({
-      status: 200,
-      data: product,
-      message: `Successfully Product ${id} Updated Data`,
-    });
+    sendResponse(res, product, `Product ${id} updated successfully`);
   } catch (error) {
-    next(error);
+    handleError(error, next);
   }
 });
 
 router.post("/multiProduct", async (req, res, next) => {
   try {
-    const [newProduct, getdata] = await prisma.$transaction([
+    const [newProduct, products] = await prisma.$transaction([
       prisma.product.create({
         data: req.body,
+        include: { category: true }
       }),
-      prisma.product.findMany().catch((error) => {
-        console.log("-----right-----", error);
-      }),
+      prisma.product.findMany({
+        include: { category: true }
+      })
     ]);
-    console.log(newProduct, getdata);
-    await prisma.$disconnect();
-
-    res.send({
-      status: 200,
-      data: newProduct,
-      message: "Product is created successfully",
-    });
+    
+    sendResponse(res, { newProduct, products }, "Product created successfully");
   } catch (error) {
-    console.log(error);
-    next(error);
+    handleError(error, next);
   }
 });
 
 router.post("/multiProduct2", async (req, res, next) => {
   try {
-    const newProduct = await prisma.$transaction(async (prisma) => {
-      const product = await prisma.product.create({
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
         data: req.body,
+        include: { category: true }
       });
-      console.log(product);
 
-      const updateproduct = await prisma.product.update({
-        where: { id: Number(product.id) },
-        data: {},
-        include: { Category: true },
-      });
-      console.log("update", updateproduct);
-      const productdata = await prisma.product.findMany().catch((error) => {
-        console.log("-----right-----", error);
-      });
-      console.log(productdata);
-      const product3 = await prisma.product.create({
+      const updatedProduct = await tx.product.update({
+        where: { id: product.id },
         data: req.body,
+        include: { category: true },
       });
-      console.log(product3);
 
-      res.send({
-        status: 200,
-        data: {
-          product: product,
-          updateproduct: updateproduct,
-          productdata: productdata,
-          product3: product3,
-        },
-        message: "Product is created successfully",
+      const allProducts = await tx.product.findMany({
+        include: { category: true }
       });
+
+      const anotherProduct = await tx.product.create({
+        data: req.body,
+        include: { category: true }
+      });
+
+      return {
+        product,
+        updatedProduct,
+        allProducts,
+        anotherProduct
+      };
     });
+
+    sendResponse(res, result, "Transaction completed successfully");
   } catch (error) {
-    console.log(error);
-    next(error);
-  } finally {
-    console.log("---Finally---");
-    await prisma.$disconnect();
+    handleError(error, next);
   }
 });
 
